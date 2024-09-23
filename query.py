@@ -8,18 +8,31 @@ from langchain.chains import LLMChain
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 
+# Try to load environment variables from .env file
 load_dotenv()
 
+# Function to get API key from user
+def get_api_key(api_name):
+    return input(f"Please enter your {api_name} API key: ")
+
+# Get Pinecone API key
+pinecone_api_key = os.environ.get("PINECONE_API_KEY")
+if not pinecone_api_key:
+    pinecone_api_key = get_api_key("Pinecone")
+
+# Get OpenAI API key
+openai_api_key = os.environ.get("OPENAI_API_KEY")
+if not openai_api_key:
+    openai_api_key = get_api_key("OpenAI")
 
 # Initialize Pinecone
-pc = Pinecone(api_key=os.environ.get("PINECONE_API_KEY"))
-openai_key = os.environ.get("OPENAI_API_KEY")
+pc = Pinecone(api_key=pinecone_api_key)
 index_name = "curriculum-data-index"
 
 if index_name not in pc.list_indexes().names():
     raise ValueError(f"Index {index_name} does not exist. Make sure to run the index creation script first.")
 
-embeddings = OpenAIEmbeddings(openai_api_key=os.environ.get("OPENAI_API_KEY"))
+embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 
 vectorstore = PineconeVectorStore(index_name=index_name, embedding=embeddings)
 
@@ -44,7 +57,7 @@ def query_response(query):
     url = "https://api.openai.com/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}"
+        "Authorization": f"Bearer {openai_api_key}"
     }
     data = {
         "model": "gpt-3.5-turbo",
@@ -63,7 +76,6 @@ def query_response(query):
         error_message = f"Error: {response.status_code}, {response.text}"
         print("Chatbot:", error_message)
         return error_message
-
 
 def chat():
     print("Welcome to the Curriculum Chatbot! Type 'exit' to end the conversation.")
