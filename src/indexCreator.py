@@ -11,7 +11,7 @@ load_dotenv()
 # Initialize Pinecone
 pc = Pinecone(api_key=os.environ.get("PINECONE_API_KEY"))
 
-index_name = "curriculum-data-index"
+index_name = "sec-data-index"
 
 # Check if the index exists, if not, create it
 if index_name not in pc.list_indexes().names():
@@ -29,7 +29,7 @@ else:
     print(f"Using existing index: {index_name}")
 
 # Load documents
-loader = DirectoryLoader('curriculumData', glob="**/*.mdx")
+loader = DirectoryLoader('secData', glob="**/*.mdx")
 docs = loader.load()
 
 # Split documents
