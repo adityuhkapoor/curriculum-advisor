@@ -1,21 +1,27 @@
+# src/scraper.py
+
 import requests
 from bs4 import BeautifulSoup
 import html2text
 import re
+import os
+import logging
 
 def scrape_website(url):
-    response = requests.get(url)
-
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.content, 'html.parser')
-        html_content = soup.prettify()
-        title_tag = soup.title
-        title = title_tag.string if title_tag else "No Title"
-        safe_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '-')
-        return html_content, safe_title
-    else:
-        print("failed to return")
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        logging.info(f"Successfully fetched {url}")
+    except requests.RequestException as e:
+        logging.error(f"Error fetching {url}: {e}")
         return None, None
+
+    soup = BeautifulSoup(response.content, 'html.parser')
+    html_content = soup.prettify()
+    title_tag = soup.title
+    title = title_tag.string if title_tag else "No Title"
+    safe_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '-')
+    return html_content, safe_title
 
 def convert_html_to_markdown(html_content):
     markdown_converter = html2text.HTML2Text()
@@ -23,25 +29,26 @@ def convert_html_to_markdown(html_content):
     markdown_content = markdown_converter.handle(html_content)
     return markdown_content
 
-urls = []
+def main():
+    urls = []
 
-with open('urls.txt', 'r') as file:
-    for line in file:
-        # Strip any extra whitespace (like newline characters) and append to the list
-        urls.append(line.strip())
-# Example usage
-for url in urls:
-    html_content, safe_title = scrape_website(url)
+    with open('data/urls.txt', 'r') as file:
+        for line in file:
+            urls.append(line.strip())
 
-    if html_content:
-        markdown_text = convert_html_to_markdown(html_content)
-        if safe_title:
-            with open(f'curriculumData/{safe_title}.mdx', 'w') as f:
+    for url in urls:
+        html_content, safe_title = scrape_website(url)
+
+        if html_content:
+            markdown_text = convert_html_to_markdown(html_content)
+            filename = f"{safe_title or 'untitled_site'}.mdx"
+            filepath = os.path.join('data', 'curriculum', filename)
+            with open(filepath, 'w', encoding='utf-8') as f:
                 f.write(markdown_text)
+            logging.info(f"Saved markdown for {url} as {filename}")
         else:
-            with open(f'curriculumData/untitled_site.mdx', 'w') as f:
-                f.write(markdown_text)
+            logging.error(f"Failed to process {url}")
 
-        print(markdown_text)
-    else:
-        print("failed")
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    main()
