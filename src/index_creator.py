@@ -18,7 +18,7 @@ def main():
 
     # Get API keys
     pinecone_api_key = os.getenv("PINECONE_API_KEY")
-    pinecone_environment = os.getenv("PINECONE_ENVIRONMENT")
+    pinecone_environment = os.getenv("PINECONE_ENVIRONMENT")  # Use this as region
     openai_api_key = os.getenv("OPENAI_API_KEY")
 
     if not all([pinecone_api_key, pinecone_environment, openai_api_key]):
@@ -27,18 +27,22 @@ def main():
 
     # Initialize Pinecone
     pinecone.init(api_key=pinecone_api_key, environment=pinecone_environment)
+
     index_name = "curriculum-data-index"
 
     # Check if the index exists, if not, create it
     if index_name not in pinecone.list_indexes():
         pinecone.create_index(
-            index_name,
+            name=index_name,
             dimension=1536,
             metric="cosine"
         )
         logging.info(f"Created new index: {index_name}")
     else:
         logging.info(f"Using existing index: {index_name}")
+
+    # Connect to the index
+    index = pinecone.Index(index_name)
 
     # Load documents
     loader = DirectoryLoader('data/curriculum', glob="**/*.mdx")
@@ -52,11 +56,14 @@ def main():
     embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 
     # Initialize Pinecone vector store
-    vectorstore = PineconeVectorStore.from_texts(
-        [t.page_content for t in texts],
-        embeddings,
-        index_name=index_name
+    vectorstore = PineconeVectorStore(
+        index=index,
+        embedding_function=embeddings.embed_query,
+        text_key="text"
     )
+
+    # Add documents to the vector store
+    vectorstore.add_texts([t.page_content for t in texts])
 
     logging.info(f"Added {len(texts)} documents to the index.")
 

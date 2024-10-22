@@ -2,8 +2,10 @@
 
 import argparse
 import logging
-from src import scraper, index_creator, chatbot
-from src.utils import load_environment_variables, configure_logging
+import scraper
+import index_creator
+import chatbot
+from utils import load_environment_variables, configure_logging
 
 def main():
     # Configure logging
