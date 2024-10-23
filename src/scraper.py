@@ -1,4 +1,4 @@
-# src/scraper.py
+# scraper.py
 
 import requests
 from bs4 import BeautifulSoup
@@ -6,6 +6,20 @@ import html2text
 import re
 import os
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def scrape_and_save(url):
+    html_content, safe_title = scrape_website(url)
+
+    if html_content:
+        markdown_text = convert_html_to_markdown(html_content)
+        filename = f"{safe_title or 'untitled_site'}.mdx"
+        filepath = os.path.join('data', 'curriculum', filename)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(markdown_text)
+        logging.info(f"Saved markdown for {url} as {filename}")
+    else:
+        logging.error(f"Failed to process {url}")
 
 def scrape_website(url):
     try:
@@ -36,18 +50,16 @@ def main():
         for line in file:
             urls.append(line.strip())
 
-    for url in urls:
-        html_content, safe_title = scrape_website(url)
+    # Process URLs in parallel using ThreadPoolExecutor
+    max_workers = min(10, len(urls))  # Limit the number of threads to avoid overwhelming the system
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(scrape_and_save, url) for url in urls]
 
-        if html_content:
-            markdown_text = convert_html_to_markdown(html_content)
-            filename = f"{safe_title or 'untitled_site'}.mdx"
-            filepath = os.path.join('data', 'curriculum', filename)
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(markdown_text)
-            logging.info(f"Saved markdown for {url} as {filename}")
-        else:
-            logging.error(f"Failed to process {url}")
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                logging.error(f"Error processing URL: {e}")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

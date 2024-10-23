@@ -1,4 +1,4 @@
-# src/index_creator.py
+# index_creator.py
 
 import os
 import logging
@@ -8,6 +8,7 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.vectorstores import Pinecone as PineconeVectorStore
 from langchain.document_loaders import DirectoryLoader
 import pinecone
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def main():
     # Configure logging
@@ -62,10 +63,38 @@ def main():
         text_key="text"
     )
 
-    # Add documents to the vector store
-    vectorstore.add_texts([t.page_content for t in texts])
+    # Prepare texts for embedding
+    texts_content = [t.page_content for t in texts]
+    total_texts = len(texts_content)
+    logging.info(f"Total texts to process: {total_texts}")
 
-    logging.info(f"Added {len(texts)} documents to the index.")
+    # Function to process embeddings in batches
+    def process_batch(batch_texts, batch_start_index):
+        batch_embeddings = embeddings.embed_documents(batch_texts)
+        # Prepare metadata and IDs
+        metadata = [{"text": text} for text in batch_texts]
+        ids = [f"id_{i}" for i in range(batch_start_index, batch_start_index + len(batch_texts))]
+        vectors = list(zip(ids, batch_embeddings, metadata))
+        # Upsert vectors to Pinecone
+        index.upsert(vectors)
+        logging.info(f"Processed batch starting at index {batch_start_index}")
+
+    # Determine batch size based on API rate limits
+    batch_size = 100  # Adjust according to OpenAI's rate limits
+    batches = [(texts_content[i:i + batch_size], i) for i in range(0, total_texts, batch_size)]
+
+    # Use ThreadPoolExecutor to process batches in parallel
+    max_workers = min(5, len(batches))  # Limit the number of threads
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_batch, batch_texts, batch_start_index) for batch_texts, batch_start_index in batches]
+
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                logging.error(f"Error processing batch: {e}")
+
+    logging.info(f"Added {total_texts} documents to the index.")
 
 if __name__ == "__main__":
     main()
