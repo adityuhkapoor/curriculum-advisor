@@ -1,4 +1,4 @@
-# Curriculum Chatbot
+# Curriculum Advisor
 
 A conversational AI assistant specialized in curriculum information, built using OpenAI's GPT models and Pinecone's vector store.
 
